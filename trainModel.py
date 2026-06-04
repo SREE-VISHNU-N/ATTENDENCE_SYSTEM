@@ -1,13 +1,20 @@
 import face_recognition
 import os
 import pickle
+import sys
 
-dataset_path = "dataset"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+dataset_path = os.path.join(BASE_DIR, "dataset")
+model_path = os.path.join(BASE_DIR, "encodings.pkl")
 
 known_encodings = []
 known_names = []
 
-print("🔄 Training started...")
+print("Training started...")
+
+if not os.path.isdir(dataset_path):
+    print("Dataset folder not found")
+    sys.exit(1)
 
 for folder in os.listdir(dataset_path):
     folder_path = os.path.join(dataset_path, folder)
@@ -28,7 +35,11 @@ for folder in os.listdir(dataset_path):
                 print(f"Encoded: {folder}")
 
         except Exception as e:
-            print(f"Error: {image_name}")
+            print(f"Error: {image_name}: {e}")
+
+if not known_encodings:
+    print("No faces were encoded. Add clear student photos before training.")
+    sys.exit(1)
 
 # Save model
 data = {
@@ -36,7 +47,7 @@ data = {
     "names": known_names
 }
 
-with open("encodings.pkl", "wb") as f:
+with open(model_path, "wb") as f:
     pickle.dump(data, f)
 
-print("✅ Training completed!")
+print("Training completed!")

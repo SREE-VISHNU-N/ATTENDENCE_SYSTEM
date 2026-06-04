@@ -13,7 +13,16 @@ import urllib.parse
 import urllib.request
 
 
-def load_env_file(path=".env"):
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "attendance.db")
+DATASET_DIR = os.path.join(BASE_DIR, "dataset")
+MODEL_PATH = os.path.join(BASE_DIR, "encodings.pkl")
+
+
+def load_env_file(path=None):
+    if path is None:
+        path = os.path.join(BASE_DIR, ".env")
+
     if not os.path.exists(path):
         return
 
@@ -42,7 +51,33 @@ recognition_process = None
 
 
 def get_db():
-    return sqlite3.connect("attendance.db")
+    return sqlite3.connect(DB_PATH)
+
+
+def safe_dataset_folder_name(register_number, name):
+    allowed = []
+
+    for char in f"{register_number}_{name}":
+        if char.isalnum() or char in ("-", "_"):
+            allowed.append(char)
+        elif char.isspace():
+            allowed.append("_")
+
+    folder_name = "".join(allowed).strip("_")
+    return folder_name or str(register_number)
+
+
+def find_student_folder(register_number):
+    if not os.path.isdir(DATASET_DIR):
+        return None
+
+    for folder in os.listdir(DATASET_DIR):
+        folder_path = os.path.join(DATASET_DIR, folder)
+
+        if os.path.isdir(folder_path) and folder.startswith(f"{register_number}_"):
+            return folder_path
+
+    return None
 
 
 def get_filters():
@@ -121,6 +156,9 @@ def admin_required():
 
 
 def update_env_value(key, value, path=".env"):
+    if not os.path.isabs(path):
+        path = os.path.join(BASE_DIR, path)
+
     lines = []
     found = False
 
@@ -160,7 +198,7 @@ def month_bounds(month_value):
 
 @app.before_request
 def require_login():
-    public_routes = {"login", "password_login", "google_login", "google_callback", "static"}
+    public_routes = {"login", "password_login", "google_login", "google_callback", "forgot_password", "static"}
 
     if request.endpoint in public_routes:
         return
@@ -583,7 +621,7 @@ def print_report():
 @app.route('/backup_db')
 def backup_db():
     return send_file(
-        "attendance.db",
+        DB_PATH,
         as_attachment=True,
         download_name=f"attendance_backup_{datetime.date.today().strftime('%Y%m%d')}.db"
     )
@@ -629,15 +667,46 @@ def edit_student(student_id):
     year = request.form.get("year", "").strip()
     section = request.form.get("section", "").strip()
 
+    if not all([name, reg, program, dept, year, section]):
+        return redirect(url_for("students"))
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE students
-        SET name = ?, register_number = ?, program = ?, department = ?, year = ?, section = ?
-        WHERE student_id = ?
-    """, (name, reg, program, dept, year, section, student_id))
-    conn.commit()
+    cursor.execute("SELECT name, register_number FROM students WHERE student_id = ?", (student_id,))
+    existing = cursor.fetchone()
+
+    if not existing:
+        conn.close()
+        return redirect(url_for("students"))
+
+    old_name, old_reg = existing
+
+    try:
+        cursor.execute("""
+            UPDATE students
+            SET name = ?, register_number = ?, program = ?, department = ?, year = ?, section = ?
+            WHERE student_id = ?
+        """, (name, reg, program, dept, year, section, student_id))
+        cursor.execute("""
+            UPDATE attendance
+            SET student_id = ?, name = ?, register_number = ?, program = ?, department = ?, year = ?, section = ?
+            WHERE register_number = ?
+        """, (student_id, name, reg, program, dept, year, section, old_reg))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        conn.close()
+        return redirect(url_for("students"))
+
     conn.close()
+
+    old_folder = find_student_folder(old_reg)
+
+    if old_folder:
+        new_folder = os.path.join(DATASET_DIR, safe_dataset_folder_name(reg, name))
+
+        if os.path.abspath(old_folder) != os.path.abspath(new_folder) and not os.path.exists(new_folder):
+            os.rename(old_folder, new_folder)
 
     return redirect(url_for("students"))
 
@@ -655,7 +724,7 @@ def delete_student(student_id):
         cursor.execute("DELETE FROM students WHERE student_id = ?", (student_id,))
         conn.commit()
 
-        folder_path = os.path.join("dataset", f"{reg}_{name}")
+        folder_path = find_student_folder(reg) or os.path.join(DATASET_DIR, safe_dataset_folder_name(reg, name))
 
         if os.path.isdir(folder_path):
             shutil.rmtree(folder_path)
@@ -667,18 +736,16 @@ def delete_student(student_id):
 
 @app.route('/student_photo/<register_number>')
 def student_photo(register_number):
-    dataset_path = "dataset"
+    folder_path = find_student_folder(register_number)
 
-    for folder in os.listdir(dataset_path) if os.path.isdir(dataset_path) else []:
-        if folder.startswith(f"{register_number}_"):
-            folder_path = os.path.join(dataset_path, folder)
-            photos = sorted(
-                photo for photo in os.listdir(folder_path)
-                if photo.lower().endswith((".jpg", ".jpeg", ".png"))
-            )
+    if folder_path:
+        photos = sorted(
+            photo for photo in os.listdir(folder_path)
+            if photo.lower().endswith((".jpg", ".jpeg", ".png"))
+        )
 
-            if photos:
-                return send_from_directory(folder_path, photos[0])
+        if photos:
+            return send_from_directory(folder_path, photos[0])
 
     return Response(status=404)
 
@@ -688,7 +755,7 @@ def train_model():
     try:
         result = subprocess.run(
             [sys.executable, "trainModel.py"],
-            cwd=os.getcwd(),
+            cwd=BASE_DIR,
             capture_output=True,
             text=True,
             timeout=120
@@ -712,9 +779,16 @@ def start_recognition():
         return jsonify({"success": True, "message": "Recognition is already running"})
 
     camera_index = request.form.get("camera_index", os.environ.get("CAMERA_INDEX", "0")).strip() or "0"
+
+    if not camera_index.isdigit():
+        return jsonify({"success": False, "message": "Camera index must be a number"}), 400
+
+    if not os.path.exists(MODEL_PATH):
+        return jsonify({"success": False, "message": "Train the face model before starting recognition"}), 400
+
     env = os.environ.copy()
     env["CAMERA_INDEX"] = camera_index
-    recognition_process = subprocess.Popen([sys.executable, "recognize.py"], cwd=os.getcwd(), env=env)
+    recognition_process = subprocess.Popen([sys.executable, "recognize.py"], cwd=BASE_DIR, env=env)
 
     return jsonify({"success": True, "message": f"Recognition started on camera {camera_index}"})
 
@@ -736,21 +810,24 @@ def stop_recognition():
 @app.route('/save_face', methods=['POST'])
 def save_face():
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
 
     if not data:
-        return jsonify({"message": "No data received!"})
+        return jsonify({"message": "No data received!"}), 400
 
-    name = data['name']
-    reg = data['reg']
-    program = data['program']
-    dept = data['dept']
-    year = data['year']
-    section = data['section']
-    image_data = data['image']
+    name = str(data.get('name', '')).strip()
+    reg = str(data.get('reg', '')).strip()
+    program = str(data.get('program', '')).strip()
+    dept = str(data.get('dept', '')).strip()
+    year = str(data.get('year', '')).strip()
+    section = str(data.get('section', '')).strip()
+    image_data = data.get('image', '')
+
+    if not all([name, reg, program, dept, year, section, image_data]):
+        return jsonify({"message": "All fields and image are required"}), 400
 
     # ---------------- DATABASE ----------------
-    conn = sqlite3.connect("attendance.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM students WHERE register_number = ?", (reg,))
@@ -767,20 +844,20 @@ def save_face():
 
         except Exception as e:
             conn.close()
-            return jsonify({"message": f"DB Error: {str(e)}"})
+            return jsonify({"message": f"DB Error: {str(e)}"}), 500
 
     conn.close()
 
     # ---------------- SAVE IMAGE ----------------
-    folder_name = f"{reg}_{name}"
-    folder_path = os.path.join("dataset", folder_name)
+    folder_name = safe_dataset_folder_name(reg, name)
+    folder_path = os.path.join(DATASET_DIR, folder_name)
     os.makedirs(folder_path, exist_ok=True)
 
     try:
         image_data = image_data.split(",")[1]
         image_bytes = base64.b64decode(image_data)
-    except:
-        return jsonify({"message": "Invalid image data"})
+    except Exception:
+        return jsonify({"message": "Invalid image data"}), 400
 
     filename = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}.jpg"
     file_path = os.path.join(folder_path, filename)

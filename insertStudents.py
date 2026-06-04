@@ -1,42 +1,62 @@
-import sqlite3
+import argparse
 import os
+import sqlite3
 
-dataset_path = "dataset"
 
-conn = sqlite3.connect("attendance.db")
-cursor = conn.cursor()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_DIR = os.path.join(BASE_DIR, "dataset")
+DB_PATH = os.path.join(BASE_DIR, "attendance.db")
 
-for folder in os.listdir(dataset_path):
 
-    # Skip invalid folders
-    if "_" not in folder:
-        continue
+def parse_args():
+    parser = argparse.ArgumentParser(description="Import students from dataset folders.")
+    parser.add_argument("--program", default="UG")
+    parser.add_argument("--department", default="ECE")
+    parser.add_argument("--year", default="1")
+    parser.add_argument("--section", default="A")
+    return parser.parse_args()
 
-    try:
+
+def main():
+    args = parse_args()
+
+    if not os.path.isdir(DATASET_DIR):
+        print("Dataset folder not found")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    inserted = 0
+
+    for folder in sorted(os.listdir(DATASET_DIR)):
+        folder_path = os.path.join(DATASET_DIR, folder)
+
+        if not os.path.isdir(folder_path) or "_" not in folder:
+            continue
+
         reg, name = folder.split("_", 1)
+        name = name.replace("_", " ").strip()
 
-    
+        cursor.execute("SELECT 1 FROM students WHERE register_number = ?", (reg,))
 
-        # 🔥 Check duplicate
-        cursor.execute("SELECT * FROM students WHERE register_number = ?", (reg,))
-        exists = cursor.fetchone()
-
-        if exists:
+        if cursor.fetchone():
             print(f"Already exists: {name}")
             continue
 
-        # 🔥 Insert student
         cursor.execute("""
             INSERT INTO students (name, register_number, program, department, year, section)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (name, reg, program, department, year, section))
+        """, (name, reg, args.program, args.department, args.year, args.section))
 
+        inserted += 1
         print(f"Inserted: {name}")
 
-    except Exception as e:
-        print(f"Error with folder {folder}: {e}")
+    conn.commit()
+    conn.close()
 
-conn.commit()
-conn.close()
+    print(f"Student import completed. Inserted {inserted} student(s).")
 
-print("✅ All students processed!")
+
+if __name__ == "__main__":
+    main()

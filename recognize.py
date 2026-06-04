@@ -5,15 +5,31 @@ import pickle
 import sqlite3
 from datetime import datetime
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "attendance.db")
+MODEL_PATH = os.path.join(BASE_DIR, "encodings.pkl")
+
 # ---------------- LOAD MODEL ----------------
-with open("encodings.pkl", "rb") as f:
+if not os.path.exists(MODEL_PATH):
+    print("Model file not found. Train the face model first.")
+    raise SystemExit(1)
+
+with open(MODEL_PATH, "rb") as f:
     data = pickle.load(f)
 
-print("✅ Model Loaded")
+if not data.get("encodings") or not data.get("names"):
+    print("Model has no face encodings. Train with clear student photos first.")
+    raise SystemExit(1)
+
+print("Model Loaded")
 
 # ---------------- CAMERA ----------------
 camera_index = int(os.environ.get("CAMERA_INDEX", "0"))
 video = cv2.VideoCapture(camera_index)
+
+if not video.isOpened():
+    print("Camera not working")
+    raise SystemExit(1)
 
 marked_today = set()  # avoid duplicate attendance in same run
 
@@ -41,18 +57,20 @@ while True:
             matched_idx = matches.index(True)
             name = data["names"][matched_idx]
 
+            if "_" not in name:
+                print(f"Invalid model label: {name}")
+                continue
+
             reg, student_name = name.split("_", 1)
 
             # Prevent duplicate marking
             if reg not in marked_today:
-                marked_today.add(reg)
-
                 now = datetime.now()
                 date = now.strftime("%Y-%m-%d")
                 time = now.strftime("%H:%M:%S")
 
                 # ---------------- DATABASE ----------------
-                conn = sqlite3.connect("attendance.db")
+                conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
 
                 # Get student full details
@@ -75,6 +93,7 @@ while True:
                     already_marked = cursor.fetchone()
 
                     if already_marked:
+                        marked_today.add(reg)
                         print(f"Already marked today: {student_name}")
                     else:
                         cursor.execute("""
@@ -98,6 +117,7 @@ while True:
                         ))
 
                         conn.commit()
+                        marked_today.add(reg)
                         print(f"Attendance marked: {student_name}")
 
                 else:

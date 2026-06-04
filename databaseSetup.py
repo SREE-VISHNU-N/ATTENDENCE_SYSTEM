@@ -1,11 +1,15 @@
 import sqlite3
+import os
 
-conn = sqlite3.connect("attendance.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "attendance.db")
+
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# 🔥 Students Table (FINAL VERSION)
+# Students Table
 cursor.execute("""
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     student_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     register_number TEXT UNIQUE,
@@ -17,9 +21,9 @@ CREATE TABLE students (
 )
 """)
 
-# 🔥 Attendance Table (FINAL VERSION)
+# Attendance Table
 cursor.execute("""
-CREATE TABLE attendance (
+CREATE TABLE IF NOT EXISTS attendance (
     attendance_id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,
     name TEXT,
@@ -37,4 +41,4 @@ CREATE TABLE attendance (
 conn.commit()
 conn.close()
 
-print("✅ Database created successfully!")
+print("Database setup completed successfully!")
