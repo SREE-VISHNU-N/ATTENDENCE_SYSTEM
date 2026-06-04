@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attendance Report</title>
+<style>
+body { color:#111827; font-family: Arial, sans-serif; margin:32px; }
+.top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; }
+h1 { font-size:24px; margin:0 0 6px; }
+p { color:#475569; margin:0; }
+button { background:#2563eb; border:0; border-radius:6px; color:white; font-weight:700; padding:10px 14px; }
+table { border-collapse:collapse; width:100%; }
+th, td { border:1px solid #d1d5db; padding:9px; text-align:left; }
+th { background:#f1f5f9; }
+@media print { button { display:none; } body { margin:0; } }
+@media (max-width: 640px) {
+    body { margin:16px; }
+    .top { display:block; }
+    button { margin-top:14px; width:100%; }
+    table { font-size:13px; min-width:720px; }
+    body { overflow-x:auto; }
+}
+</style>
+</head>
+<body>
+<div class="top">
+    <div>
+        <h1>AttendX Report</h1>
+        <p>Month: {{ month }} | Generated: {{ generated_on }}</p>
+    </div>
+    <button onclick="window.print()">Print / Save PDF</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Reg No</th>
+            <th>Class</th>
+            <th>Present Days</th>
+            <th>Total Days</th>
+            <th>Percentage</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in report_rows %}
+        <tr>
+            <td>{{ row[0] }}</td>
+            <td>{{ row[1] }}</td>
+            <td>{{ row[2] }} {{ row[3] }} - {{ row[4] }} {{ row[5] }}</td>
+            <td>{{ row[6] }}</td>
+            <td>{{ row[7] }}</td>
+            <td>{{ row[8] }}%</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>

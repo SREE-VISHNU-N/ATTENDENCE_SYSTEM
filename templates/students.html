@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Students</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+:root {
+    --bg: #eef2f7;
+    --panel: #ffffff;
+    --ink: #172033;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --brand: #2563eb;
+    --brand-dark: #1d4ed8;
+    --nav: #111827;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    display: flex;
+    min-height: 100vh;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.sidebar {
+    width: 240px;
+    height: 100vh;
+    background: var(--nav);
+    color: white;
+    padding: 24px 18px;
+    position: fixed;
+    box-shadow: 8px 0 30px rgba(15, 23, 42, 0.15);
+}
+
+.sidebar h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 34px;
+    padding-left: 10px;
+}
+
+.sidebar a {
+    display: block;
+    color: #cbd5e1;
+    padding: 12px 14px;
+    margin: 8px 0;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+    background: rgba(37, 99, 235, 0.22);
+    color: white;
+    transform: translateX(3px);
+}
+
+.mobile-bar,
+.nav-overlay {
+    display: none;
+}
+
+.content {
+    margin-left: 240px;
+    padding: 34px;
+    width: calc(100% - 240px);
+}
+
+h2 {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 22px;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+    padding: 18px;
+    animation: fadeIn 0.55s ease both;
+}
+
+.form-control {
+    border-radius: 8px;
+    border-color: var(--line);
+    min-height: 42px;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 700;
+    min-height: 42px;
+}
+
+.student-photo {
+    width: 54px;
+    height: 54px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    background: #f8fafc;
+}
+
+.table td,
+.table th {
+    vertical-align: middle;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    body {
+        display: block;
+        padding-top: 58px;
+    }
+
+    .mobile-bar {
+        align-items: center;
+        background: var(--nav);
+        color: white;
+        display: flex;
+        height: 58px;
+        justify-content: space-between;
+        left: 0;
+        padding: 0 16px;
+        position: fixed;
+        right: 0;
+        top: 0;
+        z-index: 30;
+    }
+
+    .menu-btn {
+        background: rgba(255,255,255,0.12);
+        border: 0;
+        border-radius: 8px;
+        color: white;
+        font-size: 22px;
+        height: 38px;
+        transition: background 0.2s ease, transform 0.2s ease;
+        width: 42px;
+    }
+
+    .menu-btn:active {
+        transform: scale(0.96);
+    }
+
+    .nav-overlay {
+        background: rgba(15, 23, 42, 0.48);
+        display: block;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        position: fixed;
+        transition: opacity 0.28s ease;
+        z-index: 20;
+    }
+
+    .nav-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sidebar {
+        box-shadow: 18px 0 44px rgba(15, 23, 42, 0.22);
+        height: 100vh;
+        left: 0;
+        position: fixed;
+        top: 0;
+        transform: translateX(-105%);
+        transition: transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: transform;
+        width: 260px;
+        z-index: 40;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar h2 {
+        margin-bottom: 12px;
+        padding-left: 0;
+    }
+
+    .sidebar a {
+        display: block;
+        margin: 8px 0;
+        padding: 12px 14px;
+    }
+
+    .content {
+        margin-left: 0;
+        padding: 18px;
+        width: 100%;
+    }
+
+    h2 {
+        font-size: 24px;
+    }
+
+    .panel {
+        padding: 14px;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .table {
+        min-width: 980px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="mobile-bar">
+    <strong>AttendX</strong>
+    <button class="menu-btn" onclick="toggleMobileNav()">☰</button>
+</div>
+<div class="nav-overlay" id="navOverlay" onclick="closeMobileNav()"></div>
+
+<div class="sidebar" id="sidebar">
+    <h2>AttendX</h2>
+    <a href="/register">Register</a>
+    <a href="/students" class="active">Students</a>
+    <a href="/">Dashboard</a>
+    <a href="/attendance">Attendance</a>
+    <a href="/reports">Reports</a>
+    <a href="/backup_db">Backup DB</a>
+    <a href="/logout">Logout</a>
+</div>
+
+<div class="content">
+    <h2>Student Management</h2>
+
+    <div class="panel mb-3">
+        <form method="GET" class="row g-2">
+            <div class="col-md-10">
+                <input class="form-control" name="search" value="{{ search }}" placeholder="Search by name or register number">
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100">Search</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="panel">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Photo</th>
+                        <th>Name</th>
+                        <th>Reg No</th>
+                        <th>Program</th>
+                        <th>Dept</th>
+                        <th>Year</th>
+                        <th>Section</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <form method="POST" action="/students/{{ student[0] }}/edit">
+                            <td>
+                                <img class="student-photo" src="/student_photo/{{ student[2] }}" alt="">
+                            </td>
+                            <td><input class="form-control" name="name" value="{{ student[1] }}"></td>
+                            <td><input class="form-control" name="register_number" value="{{ student[2] }}"></td>
+                            <td>
+                                <select class="form-control" name="program">
+                                    <option value="UG" {% if student[3] == 'UG' %}selected{% endif %}>UG</option>
+                                    <option value="PG" {% if student[3] == 'PG' %}selected{% endif %}>PG</option>
+                                </select>
+                            </td>
+                            <td><input class="form-control" name="department" value="{{ student[4] }}"></td>
+                            <td><input class="form-control" name="year" value="{{ student[5] }}"></td>
+                            <td><input class="form-control" name="section" value="{{ student[6] }}"></td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                        </form>
+                                <form method="POST" action="/students/{{ student[0] }}/delete" class="d-inline" onsubmit="return confirm('Delete this student and attendance records?')">
+                                    <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                                </form>
+                            </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted">No students found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleMobileNav() {
+    document.getElementById("sidebar").classList.toggle("show");
+    document.getElementById("navOverlay").classList.toggle("show");
+}
+
+function closeMobileNav() {
+    document.getElementById("sidebar").classList.remove("show");
+    document.getElementById("navOverlay").classList.remove("show");
+}
+</script>
+</body>
+</html>
